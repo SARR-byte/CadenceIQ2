@@ -3,7 +3,7 @@ import { useContacts } from '../../contexts/ContactContext';
 import { WeekDay, SequenceStage } from '../../types';
 import ContactRow from './ContactRow';
 import AddContactModal from './AddContactModal';
-import { Plus, FileSpreadsheet, Trash2 } from 'lucide-react';
+import { FileSpreadsheet, Trash2 } from 'lucide-react';
 import CSVImportModal from './CSVImportModal';
 import CelebrationEffect from '../common/CelebrationEffect';
 import SpreadsheetTable from '../common/SpreadsheetTable';
@@ -74,14 +74,6 @@ const ContactTable = ({ day, stage }: ContactTableProps) => {
       
       <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add Row
-          </button>
-          
           <button
             onClick={handleDeleteSelected}
             disabled={selectedContacts.length === 0}
