@@ -15,8 +15,7 @@ interface ContactTableProps {
 
 const ContactTable = ({ day, stage }: ContactTableProps) => {
   const { filteredContacts, leadGoal, deleteContacts } = useContacts();
-  const contacts = filteredContacts(day, stage);
-  
+  const [contacts, setContacts] = useState(filteredContacts(day, stage));
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
@@ -34,6 +33,10 @@ const ContactTable = ({ day, stage }: ContactTableProps) => {
     'Insights',
     'Contact Attempt'
   ];
+
+  useEffect(() => {
+    setContacts(filteredContacts(day, stage));
+  }, [day, stage, filteredContacts]);
 
   useEffect(() => {
     if (contacts.length > 0 && contacts.every(contact => contact.completed)) {
@@ -66,6 +69,11 @@ const ContactTable = ({ day, stage }: ContactTableProps) => {
   const handleDeleteSelected = () => {
     deleteContacts(selectedContacts);
     setSelectedContacts([]);
+  };
+
+  const handleImportComplete = () => {
+    setContacts(filteredContacts(day, stage));
+    setShowImportModal(false);
   };
 
   return (
@@ -120,6 +128,7 @@ const ContactTable = ({ day, stage }: ContactTableProps) => {
         <CSVImportModal 
           day={day}
           onClose={() => setShowImportModal(false)}
+          onComplete={handleImportComplete}
         />
       )}
     </div>

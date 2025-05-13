@@ -6,9 +6,10 @@ import { Upload, X, FileSpreadsheet, Check } from 'lucide-react';
 interface CSVImportModalProps {
   day: WeekDay;
   onClose: () => void;
+  onComplete: () => void;
 }
 
-const CSVImportModal = ({ day, onClose }: CSVImportModalProps) => {
+const CSVImportModal = ({ day, onClose, onComplete }: CSVImportModalProps) => {
   const { importContacts } = useContacts();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<Array<Record<string, string>>>([]);
@@ -83,6 +84,7 @@ const CSVImportModal = ({ day, onClose }: CSVImportModalProps) => {
       
       await importContacts(contacts);
       setImportStep('complete');
+      onComplete();
     } catch (err) {
       setError('Error importing contacts');
     }
