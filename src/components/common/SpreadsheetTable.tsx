@@ -51,7 +51,6 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const tableEndRef = useRef<HTMLDivElement>(null);
 
-  // Clear error when changing rows or active cell
   useEffect(() => {
     setError(null);
   }, [rows, activeCell]);
@@ -169,7 +168,6 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
   const handleGenerateInsights = async (rowIndex: number) => {
     setError(null);
     
-    // Validate row index
     if (rowIndex < 0 || rowIndex >= rows.length) {
       setError('Invalid row selected');
       return;
@@ -181,16 +179,14 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
       return;
     }
 
-    // Check if the contact still exists
     const contactExists = contacts?.some(contact => contact.id === row.contactId);
     if (!contactExists) {
       setError('This contact appears to have been deleted. Please refresh the page to update your view.');
       return;
     }
 
-    // Validate required social profile links
-    const hasLinkedIn = row.cells[4].value || row.cells[5].value; // Company or Contact LinkedIn
-    const hasFacebook = row.cells[6].value; // Contact Facebook
+    const hasLinkedIn = row.cells[4].value || row.cells[5].value;
+    const hasFacebook = row.cells[6].value;
     
     if (!hasLinkedIn && !hasFacebook) {
       setError('Please add at least one social profile link (LinkedIn or Facebook) to generate insights.');
@@ -232,23 +228,25 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
   const getColumnWidth = (colIndex: number) => {
     switch(columns[colIndex]) {
       case 'Entity Name':
+        return 'w-[180px] min-w-[180px] max-w-[180px]';
       case 'Primary Contact':
-      case 'Notes':
-        return 'w-[200px]';
+        return 'w-[160px] min-w-[160px] max-w-[160px]';
       case 'Email Address':
-        return 'w-[250px]';
+        return 'w-[220px] min-w-[220px] max-w-[220px]';
       case 'Phone Number':
-        return 'w-[150px]';
+        return 'w-[140px] min-w-[140px] max-w-[140px]';
       case 'Company LinkedIn':
       case 'Contact LinkedIn':
       case 'Contact Facebook':
-        return 'w-[180px]';
+        return 'w-[160px] min-w-[160px] max-w-[160px]';
+      case 'Notes':
+        return 'w-[200px] min-w-[200px] max-w-[200px]';
       case 'Insights':
-        return 'w-[100px]';
+        return 'w-[100px] min-w-[100px] max-w-[100px]';
       case 'Contact Attempt':
-        return 'w-[120px]';
+        return 'w-[120px] min-w-[120px] max-w-[120px]';
       default:
-        return 'w-[150px]';
+        return 'w-[150px] min-w-[150px] max-w-[150px]';
     }
   };
 
@@ -298,7 +296,7 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
         }}
       />
     ) : (
-      <div className="min-h-[1.5rem] whitespace-pre-wrap break-words">
+      <div className="truncate" title={cell.value}>
         {cell.value}
       </div>
     );
@@ -342,7 +340,7 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
                 {row.cells.map((cell, colIndex) => (
                   <td
                     key={cell.id}
-                    className={`border px-4 py-2 align-top ${getColumnWidth(colIndex)} ${
+                    className={`border px-4 py-2 ${getColumnWidth(colIndex)} ${
                       activeCell?.rowIndex === rowIndex && activeCell?.colIndex === colIndex
                         ? 'bg-blue-50 outline outline-2 outline-blue-500'
                         : 'hover:bg-gray-50'
