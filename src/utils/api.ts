@@ -11,6 +11,66 @@ export const openai = new OpenAI({
   dangerouslyAllowBrowser: true
 });
 
+const generateProfilePrompt = (urls: { linkedin?: string, facebook?: string }) => {
+  let prompt = 'Based on the following social media profiles:\n\n';
+  
+  if (urls.linkedin) {
+    prompt += `LinkedIn: ${urls.linkedin}\n`;
+  }
+  if (urls.facebook) {
+    prompt += `Facebook: ${urls.facebook}\n`;
+  }
+  
+  prompt += `\nProvide a detailed analysis in JSON format with the following structure:
+  {
+    "companyInfo": {
+      "founded": "string",
+      "milestones": ["string"],
+      "awards": ["string"],
+      "recentNews": ["string"],
+      "offerings": ["string"],
+      "culture": ["string"]
+    },
+    "personalInfo": {
+      "career": ["string"],
+      "education": ["string"],
+      "interests": ["string"],
+      "publications": ["string"],
+      "causes": ["string"],
+      "recentActivity": ["string"],
+      "achievements": ["string"]
+    }
+  }`;
+
+  return prompt;
+};
+
+export const generateInsights = async (urls: { linkedin?: string, facebook?: string }) => {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "user",
+          content: generateProfilePrompt(urls)
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 2000
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error('No content received from OpenAI');
+    }
+
+    return JSON.parse(content);
+  } catch (error) {
+    console.error('Error generating insights:', error);
+    throw error;
+  }
+};
+
 // Verify API key is working
 export const verifyApiKey = async () => {
   try {
