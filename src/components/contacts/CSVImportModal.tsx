@@ -36,12 +36,10 @@ const CSVImportModal = ({ day, onClose }: CSVImportModalProps) => {
         const csv = e.target?.result as string;
         const lines = csv.split('\n');
         
-        // Extract headers and remove quotes if present
         const headers = lines[0].split(',').map(header => 
           header.trim().replace(/^"(.*)"$/, '$1')
         );
         
-        // Parse data rows
         const parsedData = lines.slice(1).filter(line => line.trim()).map(line => {
           const values = line.split(',').map(value => 
             value.trim().replace(/^"(.*)"$/, '$1')
@@ -69,21 +67,21 @@ const CSVImportModal = ({ day, onClose }: CSVImportModalProps) => {
     reader.readAsText(csvFile);
   };
   
-  const handleImport = () => {
+  const handleImport = async () => {
     try {
       const contacts = preview.map(row => ({
-        entityName: row['Entity Name'] || row['Company'] || '',
-        primaryContact: row['Primary Contact'] || row['Name'] || '',
-        emailAddress: row['Email Address'] || row['Email'] || '',
-        phoneNumber: row['Phone Number'] || row['Phone'] || '',
-        companyLinkedIn: row['Company LinkedIn'] || '',
-        contactLinkedIn: row['Contact LinkedIn'] || '',
-        contactFacebook: row['Contact Facebook'] || '',
-        notes: row['Notes'] || '',
+        entityName: row['Entity Name'] || row['ENTITY NAME'] || row['Company'] || '',
+        primaryContact: row['Primary Contact'] || row['PRIMARY CONTACT'] || row['Name'] || '',
+        emailAddress: row['Email Address'] || row['EMAIL ADDRESS'] || row['Email'] || '',
+        phoneNumber: row['Phone Number'] || row['PHONE NUMBER'] || row['Phone'] || '',
+        companyLinkedIn: row['Company LinkedIn'] || row['COMPANY LINKEDIN'] || '',
+        contactLinkedIn: row['Contact LinkedIn'] || row['CONTACT LINKEDIN'] || '',
+        contactFacebook: row['Contact Facebook'] || row['CONTACT FACEBOOK'] || '',
+        notes: row['Notes'] || row['NOTES'] || '',
         day
       }));
       
-      importContacts(contacts);
+      await importContacts(contacts);
       setImportStep('complete');
     } catch (err) {
       setError('Error importing contacts');

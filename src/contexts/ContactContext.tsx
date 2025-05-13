@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { addDays, format } from 'date-fns';
+import { addDays } from 'date-fns';
 import { openai } from '../utils/api';
 import { Contact, WeekDay, SequenceStage, CalendarEvent, SocialProfile } from '../types';
 
@@ -12,7 +12,7 @@ interface ContactContextType {
   deleteContacts: (ids: string[]) => void;
   updateContact: (contact: Contact) => void;
   markContactCompleted: (id: string) => void;
-  importContacts: (contacts: Omit<Contact, 'id' | 'completed' | 'stage'>[]) => void;
+  importContacts: (contacts: Omit<Contact, 'id' | 'completed' | 'stage'>[]) => Promise<void>;
   leadGoal: number;
   setLeadGoal: (goal: number) => void;
   calendarEvents: CalendarEvent[];
@@ -26,7 +26,7 @@ const nextStageMap: Record<SequenceStage, SequenceStage> = {
   'First Email': 'Second Email',
   'Second Email': 'Phone/LinkedIn Connect',
   'Phone/LinkedIn Connect': 'Breakup Email',
-  'Breakup Email': 'Breakup Email', // End of sequence
+  'Breakup Email': 'Breakup Email',
 };
 
 const stageDaysMap: Record<SequenceStage, number> = {
@@ -162,7 +162,7 @@ export const ContactProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
-  const importContacts = (newContacts: Omit<Contact, 'id' | 'completed' | 'stage'>[]) => {
+  const importContacts = async (newContacts: Omit<Contact, 'id' | 'completed' | 'stage'>[]) => {
     const contactsToAdd = newContacts.map((contact) => ({
       ...contact,
       id: uuidv4(),
@@ -201,13 +201,11 @@ export const ContactProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const generateInsights = async (contactId: string) => {
     try {
-      // Validate contact existence first
       const contact = contacts.find(c => c.id === contactId);
       if (!contact) {
         throw new Error('Contact not found. The contact may have been deleted or is no longer available.');
       }
 
-      // Validate social profile availability
       if (!contact.companyLinkedIn && !contact.contactLinkedIn && !contact.contactFacebook) {
         throw new Error('No social profiles available for analysis. Please add at least one social profile link.');
       }
@@ -259,7 +257,6 @@ export const ContactProvider: React.FC<{ children: React.ReactNode }> = ({ child
         ? JSON.parse(personalResponse.choices[0].message.content)
         : null;
 
-      // Verify the contact still exists before updating
       const currentContact = contacts.find(c => c.id === contactId);
       if (!currentContact) {
         throw new Error('Contact was deleted during insights generation.');
