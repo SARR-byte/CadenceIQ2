@@ -2,6 +2,9 @@ import { loadStripe } from '@stripe/stripe-js';
 import { supabase } from './supabase';
 
 let stripe: Awaited<ReturnType<typeof loadStripe>> | null = null;
+let stripeLoadAttempts = 0;
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000;
 
 async function initializeStripe() {
   if (stripe) return stripe;
@@ -10,45 +13,49 @@ async function initializeStripe() {
   
   if (!stripePublishableKey) {
     console.error('Stripe publishable key is missing from environment variables');
-    throw new Error('Payment system configuration error. Please contact support.');
+    throw new Error('Payment system configuration error: Missing Stripe key');
   }
 
   try {
-    // Add error handling and retry logic for loadStripe
-    let retries = 3;
-    while (retries > 0) {
+    while (stripeLoadAttempts < MAX_RETRIES) {
       try {
+        console.log(`Attempting to load Stripe.js (attempt ${stripeLoadAttempts + 1}/${MAX_RETRIES})`);
         stripe = await loadStripe(stripePublishableKey);
-        if (stripe) break;
+        
+        if (stripe) {
+          console.log('Stripe.js loaded successfully');
+          return stripe;
+        }
       } catch (loadError) {
-        console.warn(`Attempt to load Stripe failed. Retries remaining: ${retries - 1}`);
-        retries--;
-        if (retries === 0) throw loadError;
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between retries
+        console.error(`Failed to load Stripe.js (attempt ${stripeLoadAttempts + 1}):`, loadError);
+        stripeLoadAttempts++;
+        
+        if (stripeLoadAttempts === MAX_RETRIES) {
+          throw new Error(`Failed to load Stripe.js after ${MAX_RETRIES} attempts: ${loadError.message}`);
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
       }
     }
     
-    if (!stripe) {
-      throw new Error('Failed to initialize Stripe after multiple attempts');
-    }
-    
-    return stripe;
+    throw new Error('Failed to initialize Stripe after multiple attempts');
   } catch (error) {
-    console.error('Error initializing Stripe:', error);
-    throw new Error('Payment system is currently unavailable. Please try again later.');
+    console.error('Stripe initialization error:', error);
+    throw new Error(`Payment system initialization failed: ${error.message}`);
   }
 }
 
 export async function createCheckoutSession() {
   try {
     // Initialize Stripe first
-    await initializeStripe();
+    const stripeInstance = await initializeStripe();
 
     // Make sure we have a valid Stripe instance before proceeding
-    if (!stripe) {
-      throw new Error('Stripe is not properly initialized');
+    if (!stripeInstance) {
+      throw new Error('Stripe failed to initialize properly');
     }
 
+    console.log('Creating checkout session...');
     const { data, error } = await supabase.functions.invoke(
       'create-checkout-session',
       {
@@ -58,19 +65,27 @@ export async function createCheckoutSession() {
 
     if (error) {
       console.error('Supabase function error:', error);
-      throw error;
+      throw new Error(`Checkout session creation failed: ${error.message}`);
     }
 
     if (!data?.session_url) {
-      throw new Error('Invalid response from checkout session creation');
+      throw new Error('Invalid response: Missing checkout session URL');
     }
 
+    console.log('Checkout session created successfully');
     return data.session_url;
   } catch (error) {
-    console.error('Error creating checkout session:', error);
+    console.error('Checkout session creation error:', error);
+    
+    // Provide more specific error messages based on the error type
     if (error.message.includes('configuration')) {
       throw new Error('Payment system configuration error. Please contact support.');
+    } else if (error.message.includes('Stripe.js')) {
+      throw new Error('Payment system failed to load. Please refresh the page and try again.');
+    } else if (error.message.includes('checkout session')) {
+      throw new Error('Unable to start checkout process. Please try again in a few moments.');
     }
-    throw new Error('Unable to start checkout process. Please try again later.');
+    
+    throw new Error('Payment system error. Please try again later.');
   }
 }
