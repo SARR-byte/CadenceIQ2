@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useContacts } from '../../contexts/ContactContext';
 import { WeekDay, SequenceStage } from '../../types';
-import ContactRow from './ContactRow';
-import AddContactModal from './AddContactModal';
 import { FileSpreadsheet, Trash2 } from 'lucide-react';
 import CSVImportModal from './CSVImportModal';
 import CelebrationEffect from '../common/CelebrationEffect';
@@ -16,7 +14,6 @@ interface ContactTableProps {
 const ContactTable = ({ day, stage }: ContactTableProps) => {
   const { filteredContacts, leadGoal, deleteContacts } = useContacts();
   const [contacts, setContacts] = useState(filteredContacts(day, stage));
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [showCelebration, setShowCelebration] = useState(false);
@@ -41,30 +38,12 @@ const ContactTable = ({ day, stage }: ContactTableProps) => {
   useEffect(() => {
     if (contacts.length > 0 && contacts.every(contact => contact.completed)) {
       setShowCelebration(true);
-      
       const timer = setTimeout(() => {
         setShowCelebration(false);
       }, 3000);
-      
       return () => clearTimeout(timer);
     }
   }, [contacts]);
-
-  const handleSelectContact = (id: string) => {
-    setSelectedContacts(prev => 
-      prev.includes(id) 
-        ? prev.filter(contactId => contactId !== id)
-        : [...prev, id]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedContacts.length === contacts.length) {
-      setSelectedContacts([]);
-    } else {
-      setSelectedContacts(contacts.map(contact => contact.id));
-    }
-  };
 
   const handleDeleteSelected = () => {
     deleteContacts(selectedContacts);
@@ -116,13 +95,6 @@ const ContactTable = ({ day, stage }: ContactTableProps) => {
           onSave={(data) => console.log('Saved:', data)}
         />
       </div>
-      
-      {showAddModal && (
-        <AddContactModal 
-          day={day}
-          onClose={() => setShowAddModal(false)}
-        />
-      )}
       
       {showImportModal && (
         <CSVImportModal 
