@@ -1,29 +1,52 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { supabase } from './supabase';
 
-// Initialize Stripe with retries
-async function initializeStripe(retries = 3, delay = 1000) {
+// Initialize Stripe with improved error handling and logging
+async function initializeStripe(retries = 3, delay = 2000) {
   const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  
   if (!stripeKey) {
-    throw new Error('Stripe publishable key is missing. Please check your environment variables.');
+    console.error('Stripe initialization failed: Missing publishable key');
+    throw new Error('Stripe configuration error: Missing publishable key. Please check your environment variables.');
   }
 
+  let lastError;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
+      console.log(`Attempting to initialize Stripe (attempt ${attempt}/${retries})`);
       const stripe = await loadStripe(stripeKey);
-      if (!stripe) throw new Error('Failed to initialize Stripe');
+      
+      if (!stripe) {
+        throw new Error('Stripe initialization returned null');
+      }
+      
+      console.log('Stripe successfully initialized');
       return stripe;
     } catch (error) {
-      if (attempt === retries) throw error;
-      await new Promise(resolve => setTimeout(resolve, delay));
+      lastError = error;
+      console.error(`Stripe initialization attempt ${attempt} failed:`, error);
+      
+      if (attempt === retries) {
+        console.error('All Stripe initialization attempts failed');
+        break;
+      }
+      
+      console.log(`Waiting ${delay}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, delay * attempt)); // Exponential backoff
     }
   }
+
+  throw new Error(`Failed to initialize Stripe after ${retries} attempts. ${lastError?.message || ''}`);
 }
 
 export async function createCheckoutSession() {
   try {
     // Initialize Stripe with retries
-    await initializeStripe();
+    const stripe = await initializeStripe();
+    
+    if (!stripe) {
+      throw new Error('Stripe initialization failed');
+    }
 
     // Create checkout session via Supabase Edge Function
     const { data, error } = await supabase.functions.invoke(
@@ -36,7 +59,11 @@ export async function createCheckoutSession() {
       }
     );
 
-    if (error) throw error;
+    if (error) {
+      console.error('Checkout session creation failed:', error);
+      throw error;
+    }
+    
     if (!data?.session_url) {
       throw new Error('Invalid response: Missing checkout session URL');
     }
