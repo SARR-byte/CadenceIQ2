@@ -2,7 +2,16 @@ import { loadStripe } from '@stripe/stripe-js';
 import { supabase } from './supabase';
 import type { User } from '@supabase/supabase-js';
 
-const stripe = await loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+// Add error handling for missing publishable key
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+if (!stripePublishableKey) {
+  throw new Error('Stripe publishable key is not set in environment variables');
+}
+
+const stripe = await loadStripe(stripePublishableKey);
+if (!stripe) {
+  throw new Error('Failed to initialize Stripe');
+}
 
 export async function createCheckoutSession(user: User, priceId: string) {
   const { data: { session_url }, error } = await supabase.functions.invoke(
