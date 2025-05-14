@@ -1,10 +1,8 @@
 import React, { useState, useRef, useEffect, KeyboardEvent } from 'react';
-import { ChevronDown, ChevronUp, Plus, Lightbulb, CheckCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Lightbulb } from 'lucide-react';
 import { useContacts } from '../../contexts/ContactContext';
 import { v4 as uuidv4 } from 'uuid';
 import InsightsModal from '../contacts/InsightsModal';
-import CelebrationEffect from './CelebrationEffect';
-import { toast } from 'react-toastify';
 import { SequenceStage } from '../../types';
 
 interface Cell {
@@ -16,20 +14,22 @@ interface Row {
   id: string;
   contactId: string;
   cells: Cell[];
-  stage?: SequenceStage;
-  completed?: boolean;
+  stage: SequenceStage;
+  completed: boolean;
 }
 
 interface SpreadsheetTableProps {
   columns: string[];
   initialRows?: number;
   onSave?: (data: Row[]) => void;
+  onStageChange?: (contactId: string, stage: SequenceStage) => void;
 }
 
 const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
   columns,
   initialRows = 10,
-  onSave
+  onSave,
+  onStageChange
 }) => {
   const { generateInsights, markContactCompleted } = useContacts();
   const [rows, setRows] = useState<Row[]>(() => 
@@ -53,7 +53,6 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
   const [showInsightsModal, setShowInsightsModal] = useState(false);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showCelebration, setShowCelebration] = useState(false);
   const [processingStage, setProcessingStage] = useState<string | null>(null);
   
   const cellRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -72,50 +71,46 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
     }
   }, [activeCell]);
 
-  useEffect(() => {
-    const allCompleted = rows.every(row => row.completed);
-    if (allCompleted && rows.length > 0) {
-      setShowCelebration(true);
-      setTimeout(() => setShowCelebration(false), 5000);
-    }
-  }, [rows]);
-
   const handleStageProgression = async (rowIndex: number) => {
     const row = rows[rowIndex];
     if (!row || processingStage === row.id) return;
 
     setProcessingStage(row.id);
     try {
+      const nextStage = getNextStage(row.stage);
       await markContactCompleted(row.contactId);
       
       const updatedRows = [...rows];
-      const currentRow = updatedRows[rowIndex];
-      
-      switch (currentRow.stage) {
-        case 'First Email':
-          currentRow.stage = 'Second Email';
-          break;
-        case 'Second Email':
-          currentRow.stage = 'Phone/LinkedIn Connect';
-          break;
-        case 'Phone/LinkedIn Connect':
-          currentRow.stage = 'Breakup Email';
-          currentRow.completed = true;
-          break;
-        case 'Breakup Email':
-          currentRow.completed = true;
-          break;
-      }
+      updatedRows[rowIndex] = {
+        ...row,
+        stage: nextStage,
+        completed: nextStage === 'Breakup Email'
+      };
       
       setRows(updatedRows);
       onSave?.(updatedRows);
       
-      toast.success('Contact stage updated successfully');
+      if (onStageChange) {
+        onStageChange(row.contactId, nextStage);
+      }
     } catch (error) {
       console.error('Error updating contact stage:', error);
-      toast.error('Failed to update contact stage');
+      setError('Failed to update contact stage');
     } finally {
       setProcessingStage(null);
+    }
+  };
+
+  const getNextStage = (currentStage: SequenceStage): SequenceStage => {
+    switch (currentStage) {
+      case 'First Email':
+        return 'Second Email';
+      case 'Second Email':
+        return 'Phone/LinkedIn Connect';
+      case 'Phone/LinkedIn Connect':
+        return 'Breakup Email';
+      default:
+        return 'Breakup Email';
     }
   };
 
@@ -235,20 +230,6 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
       return;
     }
 
-    const contactExists = contacts?.some(contact => contact.id === row.contactId);
-    if (!contactExists) {
-      setError('This contact appears to have been deleted. Please refresh the page to update your view.');
-      return;
-    }
-
-    const hasLinkedIn = row.cells[4].value || row.cells[5].value;
-    const hasFacebook = row.cells[6].value;
-    
-    if (!hasLinkedIn && !hasFacebook) {
-      setError('Please add at least one social profile link (LinkedIn or Facebook) to generate insights.');
-      return;
-    }
-
     setGeneratingInsights(row.id);
     try {
       await generateInsights(row.contactId);
@@ -271,7 +252,9 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
       cells: columns.map((_, colIndex) => ({
         id: `cell-${newRowIndex}-${colIndex}`,
         value: ''
-      }))
+      })),
+      stage: 'First Email',
+      completed: false
     };
     
     setRows(prev => [...prev, newRow]);
@@ -281,31 +264,6 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
     }, 100);
   };
 
-  const getColumnWidth = (colIndex: number) => {
-    switch(columns[colIndex]) {
-      case 'Entity Name':
-        return 'w-[180px] min-w-[180px] max-w-[180px]';
-      case 'Primary Contact':
-        return 'w-[160px] min-w-[160px] max-w-[160px]';
-      case 'Email Address':
-        return 'w-[220px] min-w-[220px] max-w-[220px]';
-      case 'Phone Number':
-        return 'w-[140px] min-w-[140px] max-w-[140px]';
-      case 'Company LinkedIn':
-      case 'Contact LinkedIn':
-      case 'Contact Facebook':
-        return 'w-[160px] min-w-[160px] max-w-[160px]';
-      case 'Notes':
-        return 'w-[200px] min-w-[200px] max-w-[200px]';
-      case 'Insights':
-        return 'w-[100px] min-w-[100px] max-w-[100px]';
-      case 'Contact Attempt':
-        return 'w-[120px] min-w-[120px] max-w-[120px]';
-      default:
-        return 'w-[150px] min-w-[150px] max-w-[150px]';
-    }
-  };
-
   const renderCell = (rowIndex: number, colIndex: number, cell: Cell) => {
     const isInsightsColumn = columns[colIndex] === 'Insights';
     const isContactAttemptColumn = columns[colIndex] === 'Contact Attempt';
@@ -313,7 +271,7 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
     
     if (isContactAttemptColumn) {
       return (
-        <div className="flex justify-center items-center">
+        <div className="flex justify-center">
           <button
             onClick={() => handleStageProgression(rowIndex)}
             disabled={processingStage === row.id || row.completed}
@@ -325,22 +283,8 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
                 : 'bg-blue-500 text-white hover:bg-blue-600'
             }`}
           >
-            {row.completed ? (
-              <span className="flex items-center">
-                <CheckCircle className="w-4 h-4 mr-1" />
-                Complete
-              </span>
-            ) : processingStage === row.id ? (
-              'Processing...'
-            ) : (
-              'Yes'
-            )}
+            {row.completed ? 'Complete' : processingStage === row.id ? 'Processing...' : 'Yes'}
           </button>
-          {!row.completed && (
-            <div className="ml-2 text-sm text-gray-500">
-              Stage: {row.stage}
-            </div>
-          )}
         </div>
       );
     }
@@ -396,8 +340,6 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
 
   return (
     <div className="space-y-4">
-      {showCelebration && <CelebrationEffect />}
-      
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
           <span className="block sm:inline">{error}</span>
@@ -485,6 +427,31 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
       )}
     </div>
   );
+};
+
+const getColumnWidth = (colIndex: number) => {
+  switch(colIndex) {
+    case 0: // Entity Name
+      return 'w-[180px] min-w-[180px] max-w-[180px]';
+    case 1: // Primary Contact
+      return 'w-[160px] min-w-[160px] max-w-[160px]';
+    case 2: // Email Address
+      return 'w-[220px] min-w-[220px] max-w-[220px]';
+    case 3: // Phone Number
+      return 'w-[140px] min-w-[140px] max-w-[140px]';
+    case 4: // Company LinkedIn
+    case 5: // Contact LinkedIn
+    case 6: // Contact Facebook
+      return 'w-[160px] min-w-[160px] max-w-[160px]';
+    case 7: // Notes
+      return 'w-[200px] min-w-[200px] max-w-[200px]';
+    case 8: // Insights
+      return 'w-[100px] min-w-[100px] max-w-[100px]';
+    case 9: // Contact Attempt
+      return 'w-[120px] min-w-[120px] max-w-[120px]';
+    default:
+      return 'w-[150px] min-w-[150px] max-w-[150px]';
+  }
 };
 
 export default SpreadsheetTable;
