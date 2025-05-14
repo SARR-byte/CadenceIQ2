@@ -53,7 +53,10 @@ export function DataTable<T>({ data, columns, frozenColumns = [] }: DataTablePro
     const newWidth = Math.floor(availableWidth / visibleColumns.length);
     
     visibleColumns.forEach(column => {
-      column.setSize(newWidth);
+      const tableColumn = table.getColumn(column.id);
+      if (tableColumn) {
+        tableColumn.setSize(newWidth);
+      }
     });
   };
 
