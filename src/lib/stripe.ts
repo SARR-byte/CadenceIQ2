@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 
 // Initialize Stripe with improved error handling and logging
 async function initializeStripe(retries = 3, delay = 2000) {
-  const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY?.trim();
   
   if (!stripeKey) {
     throw new Error('Missing Stripe publishable key. Please check your environment variables.');
@@ -15,11 +15,16 @@ async function initializeStripe(retries = 3, delay = 2000) {
 
   // Check if we can reach Stripe's CDN
   try {
-    const response = await fetch('https://js.stripe.com/v3/');
-    if (!response.ok) {
-      throw new Error(`Unable to reach Stripe CDN: ${response.statusText}`);
+    const response = await fetch('https://js.stripe.com/v3/', {
+      method: 'HEAD',  // Only fetch headers to check availability
+      mode: 'no-cors'  // Avoid CORS issues when checking CDN
+    });
+    
+    if (!response.type === 'opaque') {
+      throw new Error('Unable to verify Stripe CDN availability');
     }
   } catch (error) {
+    console.error('Stripe CDN check failed:', error);
     throw new Error('Network error: Unable to load Stripe resources. Please check your internet connection.');
   }
 
@@ -27,6 +32,12 @@ async function initializeStripe(retries = 3, delay = 2000) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       console.log(`Attempting to initialize Stripe (attempt ${attempt}/${retries})`);
+      
+      // Add a small delay between retries to avoid rate limiting
+      if (attempt > 1) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      
       const stripe = await loadStripe(stripeKey);
       
       if (!stripe) {
@@ -43,8 +54,6 @@ async function initializeStripe(retries = 3, delay = 2000) {
         console.error('All Stripe initialization attempts failed');
         break;
       }
-      
-      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 
