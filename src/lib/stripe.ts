@@ -17,28 +17,15 @@ async function initializeStripe() {
   }
 
   try {
-    while (stripeLoadAttempts < MAX_RETRIES) {
-      try {
-        console.log(`Attempting to load Stripe.js (attempt ${stripeLoadAttempts + 1}/${MAX_RETRIES})`);
-        stripe = await loadStripe(stripePublishableKey);
-        
-        if (stripe) {
-          console.log('Stripe.js loaded successfully');
-          return stripe;
-        }
-      } catch (loadError) {
-        console.error(`Failed to load Stripe.js (attempt ${stripeLoadAttempts + 1}):`, loadError);
-        stripeLoadAttempts++;
-        
-        if (stripeLoadAttempts === MAX_RETRIES) {
-          throw new Error(`Failed to load Stripe.js after ${MAX_RETRIES} attempts: ${loadError.message}`);
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-      }
+    console.log('Loading Stripe.js with key:', stripePublishableKey.substring(0, 8) + '...');
+    stripe = await loadStripe(stripePublishableKey);
+    
+    if (stripe) {
+      console.log('Stripe.js loaded successfully');
+      return stripe;
     }
     
-    throw new Error('Failed to initialize Stripe after multiple attempts');
+    throw new Error('Failed to initialize Stripe (stripe instance is null)');
   } catch (error) {
     console.error('Stripe initialization error:', error);
     throw new Error(`Payment system initialization failed: ${error.message}`);
