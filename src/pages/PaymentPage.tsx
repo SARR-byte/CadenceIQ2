@@ -1,24 +1,15 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Network } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { createCheckoutSession } from '../lib/stripe';
-import { useAuth } from '../contexts/AuthContext';
 
 const PaymentPage = () => {
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-  const { user } = useAuth();
 
   const handlePayment = async () => {
-    if (!user) {
-      toast.error('Please sign in to continue');
-      return;
-    }
-
     setLoading(true);
     try {
-      const sessionUrl = await createCheckoutSession(user, 'price_H5ggYwtDq123'); // Replace with your actual price ID
+      const sessionUrl = await createCheckoutSession();
       window.location.href = sessionUrl;
     } catch (error) {
       console.error('Payment error:', error);
@@ -83,4 +74,4 @@ const PaymentPage = () => {
   );
 };
 
-export default PaymentPage
+export default PaymentPage;

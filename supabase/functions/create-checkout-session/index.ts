@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { stripe } from '../_shared/stripe.ts';
-import { supabaseClient } from '../_shared/supabase.ts';
+import { supabase } from '../_shared/supabase.ts';
+import { createHash } from 'https://deno.land/std@0.196.0/crypto/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,52 +14,40 @@ serve(async (req) => {
   }
 
   try {
-    const { price_id } = await req.json();
-    const authHeader = req.headers.get('Authorization');
-    
-    if (!authHeader) {
-      throw new Error('No authorization header');
-    }
+    const { mode, amount } = await req.json();
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-
-    if (userError || !user) {
-      throw new Error('Invalid user token');
-    }
-
-    const { data: userData, error: dbError } = await supabaseClient
-      .from('users')
-      .select('stripe_customer_id')
-      .eq('id', user.id)
-      .single();
-
-    if (dbError) throw dbError;
-
-    let customerId = userData?.stripe_customer_id;
-
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        metadata: {
-          supabase_user_id: user.id,
-        },
-      });
-      customerId = customer.id;
-
-      await supabaseClient
-        .from('users')
-        .update({ stripe_customer_id: customerId })
-        .eq('id', user.id);
-    }
+    // Generate a unique access token
+    const token = createHash('sha256')
+      .update(crypto.randomUUID() + Date.now().toString())
+      .toString('hex')
+      .slice(0, 32);
 
     const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      line_items: [{ price: price_id, quantity: 1 }],
-      mode: 'subscription',
-      success_url: `${req.headers.get('origin')}/account?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get('origin')}/pricing`,
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'CadenceIQ - Contact Management',
+              description: 'One-time purchase for lifetime access',
+            },
+            unit_amount: amount,
+          },
+          quantity: 1,
+        },
+      ],
+      mode: mode,
+      success_url: `${req.headers.get('origin')}/access/${token}`,
+      cancel_url: `${req.headers.get('origin')}/payment`,
     });
+
+    // Store the access token
+    const { error: tokenError } = await supabase
+      .from('access_tokens')
+      .insert([{ token }]);
+
+    if (tokenError) throw tokenError;
 
     return new Response(
       JSON.stringify({ session_url: session.url }),

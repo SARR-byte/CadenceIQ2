@@ -1,10 +1,8 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { supabase } from './supabase';
-import type { User } from '@supabase/supabase-js';
 
 let stripe: Awaited<ReturnType<typeof loadStripe>> | null = null;
 
-// Initialize stripe with better error handling
 async function initializeStripe() {
   if (stripe) return stripe;
 
@@ -29,15 +27,14 @@ async function initializeStripe() {
   }
 }
 
-export async function createCheckoutSession(user: User, priceId: string) {
-  // Ensure Stripe is initialized before creating checkout session
+export async function createCheckoutSession() {
   await initializeStripe();
 
   try {
     const { data: { session_url }, error } = await supabase.functions.invoke(
       'create-checkout-session',
       {
-        body: { price_id: priceId },
+        body: { mode: 'payment', amount: 995 }
       }
     );
 
@@ -46,42 +43,5 @@ export async function createCheckoutSession(user: User, priceId: string) {
   } catch (error) {
     console.error('Error creating checkout session:', error);
     throw new Error('Unable to start checkout process. Please try again later.');
-  }
-}
-
-export async function createCustomerPortalSession(user: User) {
-  // Ensure Stripe is initialized before creating portal session
-  await initializeStripe();
-
-  try {
-    const { data: { portal_url }, error } = await supabase.functions.invoke(
-      'create-portal-session'
-    );
-
-    if (error) throw error;
-    return portal_url;
-  } catch (error) {
-    console.error('Error creating portal session:', error);
-    throw new Error('Unable to access customer portal. Please try again later.');
-  }
-}
-
-export async function handleSubscriptionChange(
-  user: User,
-  subscription: any
-) {
-  try {
-    const { error } = await supabase
-      .from('users')
-      .update({
-        subscription_status: subscription.status,
-        subscription_tier: subscription.items.data[0].price.nickname,
-      })
-      .eq('id', user.id);
-
-    if (error) throw error;
-  } catch (error) {
-    console.error('Error updating subscription:', error);
-    throw new Error('Failed to update subscription status. Please contact support.');
   }
 }
