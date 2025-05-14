@@ -13,19 +13,20 @@ async function initializeStripe(retries = 3, delay = 2000) {
     throw new Error('Invalid Stripe publishable key format. Key must start with "pk_".');
   }
 
-  // Check if we can reach Stripe's CDN
+  // Simplified CDN check that's more resilient
   try {
     const response = await fetch('https://js.stripe.com/v3/', {
-      method: 'HEAD',  // Only fetch headers to check availability
-      mode: 'no-cors'  // Avoid CORS issues when checking CDN
+      method: 'HEAD',
+      mode: 'no-cors'
     });
     
-    if (!response.type === 'opaque') {
-      throw new Error('Unable to verify Stripe CDN availability');
+    // With no-cors, we can't check status, but we can verify the response exists
+    if (!response) {
+      console.warn('Stripe CDN check returned unexpected response');
     }
   } catch (error) {
-    console.error('Stripe CDN check failed:', error);
-    throw new Error('Network error: Unable to load Stripe resources. Please check your internet connection.');
+    // Log the error but don't fail - Stripe's loadStripe will handle actual availability
+    console.warn('Stripe CDN pre-check warning:', error);
   }
 
   let lastError;
