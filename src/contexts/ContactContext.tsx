@@ -203,11 +203,11 @@ export const ContactProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const contact = contacts.find(c => c.id === contactId);
       if (!contact) {
-        throw new Error('Contact not found. The contact may have been deleted or is no longer available.');
+        throw new Error('Contact not found');
       }
 
       if (!contact.companyLinkedIn && !contact.contactLinkedIn && !contact.contactFacebook) {
-        throw new Error('No social profiles available for analysis. Please add at least one social profile link.');
+        throw new Error('No social profiles available for analysis');
       }
 
       const insights = await generateInsights({
@@ -224,7 +224,7 @@ export const ContactProvider: React.FC<{ children: React.ReactNode }> = ({ child
       
     } catch (error) {
       console.error('Error generating insights:', error);
-      throw error instanceof Error ? error : new Error('An unexpected error occurred while generating insights');
+      throw error instanceof Error ? error : new Error('An unexpected error occurred');
     }
   };
 
