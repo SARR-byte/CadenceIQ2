@@ -14,6 +14,13 @@ if (!supabaseAnonKey) {
   throw new Error('Missing environment variable: VITE_SUPABASE_ANON_KEY');
 }
 
+// Validate URL format
+try {
+  new URL(supabaseUrl);
+} catch (error) {
+  throw new Error(`Invalid VITE_SUPABASE_URL: ${supabaseUrl}. Must be a valid URL (e.g., https://your-project-id.supabase.co)`);
+}
+
 // Create and export the Supabase client
 export const supabase = createClient<Database>(
   supabaseUrl,
