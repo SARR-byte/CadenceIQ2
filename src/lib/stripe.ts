@@ -6,8 +6,7 @@ async function initializeStripe(retries = 3, delay = 2000) {
   const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
   
   if (!stripeKey) {
-    console.error('Stripe initialization failed: Missing publishable key');
-    throw new Error('Stripe configuration error: Missing publishable key. Please check your environment variables.');
+    throw new Error('Missing Stripe publishable key. Please check your environment variables and ensure you have copied .env.example to .env with your Stripe key.');
   }
 
   let lastError;
@@ -24,31 +23,28 @@ async function initializeStripe(retries = 3, delay = 2000) {
       return stripe;
     } catch (error) {
       lastError = error;
-      console.error(`Stripe initialization attempt ${attempt} failed:`, error);
+      console.warn(`Stripe initialization attempt ${attempt} failed:`, error);
       
       if (attempt === retries) {
         console.error('All Stripe initialization attempts failed');
         break;
       }
       
-      console.log(`Waiting ${delay}ms before retry...`);
-      await new Promise(resolve => setTimeout(resolve, delay * attempt)); // Exponential backoff
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 
-  throw new Error(`Failed to initialize Stripe after ${retries} attempts. ${lastError?.message || ''}`);
+  throw new Error(`Unable to initialize Stripe payment system. Please ensure you have a stable internet connection and valid Stripe configuration. If the issue persists, contact support. Technical details: ${lastError?.message || 'Unknown error'}`);
 }
 
 export async function createCheckoutSession() {
   try {
-    // Initialize Stripe with retries
     const stripe = await initializeStripe();
     
     if (!stripe) {
       throw new Error('Stripe initialization failed');
     }
 
-    // Create checkout session via Supabase Edge Function
     const { data, error } = await supabase.functions.invoke(
       'create-checkout-session',
       {
