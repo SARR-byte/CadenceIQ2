@@ -8,20 +8,29 @@ async function getStripe() {
   if (!stripePromise) {
     const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
     
-    if (!stripeKey) {
-      throw new Error('Missing Stripe publishable key');
+    if (!stripeKey || stripeKey.trim() === '') {
+      throw new Error('Stripe publishable key is missing or empty. Please check your .env file.');
     }
 
-    stripePromise = loadStripe(stripeKey);
+    try {
+      stripePromise = loadStripe(stripeKey);
+    } catch (error) {
+      stripePromise = null; // Reset for retry
+      throw new Error(`Failed to initialize Stripe: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
   
-  const stripe = await stripePromise;
-  if (!stripe) {
+  try {
+    const stripe = await stripePromise;
+    if (!stripe) {
+      stripePromise = null; // Reset for retry
+      throw new Error('Failed to load Stripe - stripe instance is null');
+    }
+    return stripe;
+  } catch (error) {
     stripePromise = null; // Reset for retry
-    throw new Error('Failed to load Stripe');
+    throw new Error(`Failed to load Stripe: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-  
-  return stripe;
 }
 
 export async function createCheckoutSession() {
