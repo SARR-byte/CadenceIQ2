@@ -6,7 +6,21 @@ async function initializeStripe(retries = 3, delay = 2000) {
   const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
   
   if (!stripeKey) {
-    throw new Error('Missing Stripe publishable key. Please check your environment variables and ensure you have copied .env.example to .env with your Stripe key.');
+    throw new Error('Missing Stripe publishable key. Please check your environment variables.');
+  }
+
+  if (!stripeKey.startsWith('pk_')) {
+    throw new Error('Invalid Stripe publishable key format. Key must start with "pk_".');
+  }
+
+  // Check if we can reach Stripe's CDN
+  try {
+    const response = await fetch('https://js.stripe.com/v3/');
+    if (!response.ok) {
+      throw new Error(`Unable to reach Stripe CDN: ${response.statusText}`);
+    }
+  } catch (error) {
+    throw new Error('Network error: Unable to load Stripe resources. Please check your internet connection.');
   }
 
   let lastError;
@@ -34,7 +48,8 @@ async function initializeStripe(retries = 3, delay = 2000) {
     }
   }
 
-  throw new Error(`Unable to initialize Stripe payment system. Please ensure you have a stable internet connection and valid Stripe configuration. If the issue persists, contact support. Technical details: ${lastError?.message || 'Unknown error'}`);
+  const errorMessage = lastError instanceof Error ? lastError.message : 'Unknown error';
+  throw new Error(`Unable to initialize Stripe payment system: ${errorMessage}. Please try refreshing the page. If the issue persists, contact support.`);
 }
 
 export async function createCheckoutSession() {
