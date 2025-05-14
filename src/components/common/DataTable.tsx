@@ -23,10 +23,14 @@ export function DataTable<T>({ data, columns, frozenColumns = [] }: DataTablePro
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [tableWidth, setTableWidth] = useState(0);
+  const [columnSizes, setColumnSizes] = useState<{ [key: string]: number }>({});
 
   const table = useReactTable({
     data,
-    columns,
+    columns: columns.map(col => ({
+      ...col,
+      size: columnSizes[col.id as string] || col.size,
+    })),
     state: {
       columnVisibility,
     },
@@ -48,16 +52,22 @@ export function DataTable<T>({ data, columns, frozenColumns = [] }: DataTablePro
   }, []);
 
   const fitToScreen = () => {
-    const availableWidth = tableWidth;
+    const availableWidth = tableWidth - 48; // Account for padding
     const visibleColumns = table.getAllColumns().filter(col => col.getIsVisible());
-    const newWidth = Math.floor(availableWidth / visibleColumns.length);
+    const totalMinWidth = visibleColumns.reduce((acc, col) => acc + (col.columnDef.minSize || 50), 0);
     
-    visibleColumns.forEach(column => {
-      const tableColumn = table.getColumn(column.id);
-      if (tableColumn) {
-        tableColumn.columnDef.size = newWidth;
-      }
-    });
+    if (availableWidth > totalMinWidth) {
+      const newSizes = { ...columnSizes };
+      const remainingWidth = availableWidth - totalMinWidth;
+      const extraWidthPerColumn = Math.floor(remainingWidth / visibleColumns.length);
+      
+      visibleColumns.forEach(column => {
+        const minSize = column.columnDef.minSize || 50;
+        newSizes[column.id] = minSize + extraWidthPerColumn;
+      });
+      
+      setColumnSizes(newSizes);
+    }
   };
 
   const frozenColumnStyles = useMemo(() => {
@@ -79,6 +89,13 @@ export function DataTable<T>({ data, columns, frozenColumns = [] }: DataTablePro
 
     return styles;
   }, [frozenColumns, table.getAllColumns()]);
+
+  const handleColumnResize = (columnId: string, width: number) => {
+    setColumnSizes(prev => ({
+      ...prev,
+      [columnId]: Math.max(width, 50), // Ensure minimum width of 50px
+    }));
+  };
 
   return (
     <div className="space-y-4">
@@ -158,7 +175,7 @@ export function DataTable<T>({ data, columns, frozenColumns = [] }: DataTablePro
                         height={10}
                         handle={<div className="absolute right-0 top-0 h-full w-4 cursor-col-resize bg-transparent hover:bg-blue-500 hover:opacity-50" />}
                         onResize={(e, { size }) => {
-                          header.column.columnDef.size = size.width;
+                          handleColumnResize(header.column.id, size.width);
                         }}
                         draggableOpts={{ enableUserSelectHack: false }}
                       />
