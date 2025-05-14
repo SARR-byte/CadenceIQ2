@@ -55,7 +55,7 @@ export function DataTable<T>({ data, columns, frozenColumns = [] }: DataTablePro
     visibleColumns.forEach(column => {
       const tableColumn = table.getColumn(column.id);
       if (tableColumn) {
-        tableColumn.setSize(newWidth);
+        tableColumn.columnDef.size = newWidth;
       }
     });
   };
@@ -158,7 +158,7 @@ export function DataTable<T>({ data, columns, frozenColumns = [] }: DataTablePro
                         height={10}
                         handle={<div className="absolute right-0 top-0 h-full w-4 cursor-col-resize bg-transparent hover:bg-blue-500 hover:opacity-50" />}
                         onResize={(e, { size }) => {
-                          header.column.setSize(size.width);
+                          header.column.columnDef.size = size.width;
                         }}
                         draggableOpts={{ enableUserSelectHack: false }}
                       />
