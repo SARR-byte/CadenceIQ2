@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useContacts } from '../../contexts/ContactContext';
 import { WeekDay } from '../../types';
-import { Upload, X, FileSpreadsheet, Check } from 'lucide-react';
+import { Upload, X, FileSpreadsheet, Check, AlertCircle } from 'lucide-react';
+import Papa from 'papaparse';
+import { toast } from 'react-toastify';
 
 interface CSVImportModalProps {
   day: WeekDay;
@@ -9,87 +11,98 @@ interface CSVImportModalProps {
   onComplete: () => void;
 }
 
+interface CSVRow {
+  [key: string]: string;
+}
+
 const CSVImportModal = ({ day, onClose, onComplete }: CSVImportModalProps) => {
   const { importContacts } = useContacts();
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<Array<Record<string, string>>>([]);
+  const [preview, setPreview] = useState<CSVRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [importStep, setImportStep] = useState<'upload' | 'preview' | 'complete'>('upload');
-  
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-    
-    if (selectedFile.type !== 'text/csv' && !selectedFile.name.endsWith('.csv')) {
-      setError('Please select a valid CSV file');
-      return;
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const validateHeaders = (headers: string[]): boolean => {
+    const requiredFields = ['Entity Name', 'Primary Contact', 'Email Address'];
+    const normalizedHeaders = headers.map(h => h.toLowerCase().trim());
+    return requiredFields.every(field => 
+      normalizedHeaders.includes(field.toLowerCase()) ||
+      normalizedHeaders.includes(field.toLowerCase().replace(' ', '_'))
+    );
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile?.type === 'text/csv' || droppedFile?.name.endsWith('.csv')) {
+      handleFileSelection(droppedFile);
+    } else {
+      setError('Please drop a valid CSV file');
     }
-    
+  }, []);
+
+  const handleFileSelection = (selectedFile: File) => {
     setFile(selectedFile);
     setError(null);
-    parseCSV(selectedFile);
-  };
-  
-  const parseCSV = (csvFile: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const csv = e.target?.result as string;
-        const lines = csv.split('\n');
-        
-        const headers = lines[0].split(',').map(header => 
-          header.trim().replace(/^"(.*)"$/, '$1')
-        );
-        
-        const parsedData = lines.slice(1).filter(line => line.trim()).map(line => {
-          const values = line.split(',').map(value => 
-            value.trim().replace(/^"(.*)"$/, '$1')
-          );
-          
-          const row: Record<string, string> = {};
-          headers.forEach((header, index) => {
-            row[header] = values[index] || '';
-          });
-          
-          return row;
-        });
-        
-        setPreview(parsedData);
+    
+    Papa.parse(selectedFile, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        if (results.errors.length > 0) {
+          setError('Error parsing CSV file: ' + results.errors[0].message);
+          return;
+        }
+
+        if (!validateHeaders(results.meta.fields || [])) {
+          setError('CSV must include Entity Name, Primary Contact, and Email Address columns');
+          return;
+        }
+
+        setPreview(results.data as CSVRow[]);
         setImportStep('preview');
-      } catch (err) {
-        setError('Error parsing CSV file. Please check the format.');
+      },
+      error: (error) => {
+        setError('Error reading CSV file: ' + error.message);
       }
-    };
-    
-    reader.onerror = () => {
-      setError('Error reading the file');
-    };
-    
-    reader.readAsText(csvFile);
+    });
   };
-  
+
   const handleImport = async () => {
     try {
+      setIsProcessing(true);
+      setError(null);
+
       const contacts = preview.map(row => ({
-        entityName: row['Entity Name'] || row['ENTITY NAME'] || row['Company'] || '',
-        primaryContact: row['Primary Contact'] || row['PRIMARY CONTACT'] || row['Name'] || '',
-        emailAddress: row['Email Address'] || row['EMAIL ADDRESS'] || row['Email'] || '',
-        phoneNumber: row['Phone Number'] || row['PHONE NUMBER'] || row['Phone'] || '',
-        companyLinkedIn: row['Company LinkedIn'] || row['COMPANY LINKEDIN'] || '',
-        contactLinkedIn: row['Contact LinkedIn'] || row['CONTACT LINKEDIN'] || '',
-        contactFacebook: row['Contact Facebook'] || row['CONTACT FACEBOOK'] || '',
-        notes: row['Notes'] || row['NOTES'] || '',
+        entityName: row['Entity Name'] || row['ENTITY NAME'] || row['entity_name'] || '',
+        primaryContact: row['Primary Contact'] || row['PRIMARY CONTACT'] || row['primary_contact'] || '',
+        emailAddress: row['Email Address'] || row['EMAIL ADDRESS'] || row['email_address'] || '',
+        phoneNumber: row['Phone Number'] || row['PHONE NUMBER'] || row['phone_number'] || '',
+        companyLinkedIn: row['Company LinkedIn'] || row['COMPANY LINKEDIN'] || row['company_linkedin'] || '',
+        contactLinkedIn: row['Contact LinkedIn'] || row['CONTACT LINKEDIN'] || row['contact_linkedin'] || '',
+        contactFacebook: row['Contact Facebook'] || row['CONTACT FACEBOOK'] || row['contact_facebook'] || '',
+        notes: row['Notes'] || row['NOTES'] || row['notes'] || '',
         day
       }));
-      
+
+      if (!contacts.every(c => c.entityName && c.primaryContact && c.emailAddress)) {
+        throw new Error('All contacts must have an entity name, primary contact, and email address');
+      }
+
       await importContacts(contacts);
       setImportStep('complete');
+      toast.success(`Successfully imported ${contacts.length} contacts`);
       onComplete();
     } catch (err) {
-      setError('Error importing contacts');
+      const errorMessage = err instanceof Error ? err.message : 'Error importing contacts';
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsProcessing(false);
     }
   };
-  
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -114,11 +127,15 @@ const CSVImportModal = ({ day, onClose, onComplete }: CSVImportModalProps) => {
           
           <div className="px-6 py-4">
             {importStep === 'upload' && (
-              <div className="space-y-4">
+              <div 
+                className="space-y-4"
+                onDrop={handleDrop}
+                onDragOver={(e) => e.preventDefault()}
+              >
                 <div className="text-center p-6 border-2 border-dashed border-gray-300 rounded-md">
                   <FileSpreadsheet className="mx-auto h-12 w-12 text-gray-400" />
                   <div className="mt-2 text-sm text-gray-600">
-                    <label htmlFor="csv-upload" className="cursor-pointer font-medium text-blue-600 hover:text-blue-500">
+                    <label htmlFor="csv-upload" className="cursor-pointer font-medium text-charcoal-600 hover:text-charcoal-500">
                       Upload a CSV file
                       <input
                         id="csv-upload"
@@ -126,27 +143,31 @@ const CSVImportModal = ({ day, onClose, onComplete }: CSVImportModalProps) => {
                         type="file"
                         accept=".csv"
                         className="sr-only"
-                        onChange={handleFileChange}
+                        onChange={(e) => e.target.files?.[0] && handleFileSelection(e.target.files[0])}
                       />
                     </label>
                     <p className="mt-1">or drag and drop</p>
                   </div>
                   <p className="mt-1 text-xs text-gray-500">
-                    CSV file should include: Entity Name, Primary Contact, Email Address, Phone Number
+                    CSV file should include: Entity Name, Primary Contact, Email Address
                   </p>
                   {error && (
-                    <p className="mt-2 text-sm text-red-600">
+                    <div className="mt-2 flex items-center text-sm text-red-600">
+                      <AlertCircle className="h-4 w-4 mr-1" />
                       {error}
-                    </p>
+                    </div>
                   )}
                 </div>
                 
                 <div className="text-sm text-gray-500">
-                  <p>Column mapping:</p>
+                  <p>Required columns:</p>
                   <ul className="list-disc pl-5 mt-1">
-                    <li>Entity Name (required)</li>
-                    <li>Primary Contact (required)</li>
-                    <li>Email Address (required)</li>
+                    <li>Entity Name</li>
+                    <li>Primary Contact</li>
+                    <li>Email Address</li>
+                  </ul>
+                  <p className="mt-2">Optional columns:</p>
+                  <ul className="list-disc pl-5 mt-1">
                     <li>Phone Number</li>
                     <li>Company LinkedIn</li>
                     <li>Contact LinkedIn</li>
@@ -202,9 +223,10 @@ const CSVImportModal = ({ day, onClose, onComplete }: CSVImportModalProps) => {
                 </div>
                 
                 {error && (
-                  <p className="text-sm text-red-600">
+                  <div className="flex items-center text-sm text-red-600">
+                    <AlertCircle className="h-4 w-4 mr-1" />
                     {error}
-                  </p>
+                  </div>
                 )}
               </div>
             )}
@@ -224,15 +246,13 @@ const CSVImportModal = ({ day, onClose, onComplete }: CSVImportModalProps) => {
           
           <div className="px-6 py-4 bg-gray-50 text-right">
             {importStep === 'upload' && (
-              <>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none"
-                >
-                  Cancel
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none"
+              >
+                Cancel
+              </button>
             )}
             
             {importStep === 'preview' && (
@@ -241,16 +261,27 @@ const CSVImportModal = ({ day, onClose, onComplete }: CSVImportModalProps) => {
                   type="button"
                   onClick={() => setImportStep('upload')}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none mr-2"
+                  disabled={isProcessing}
                 >
                   Back
                 </button>
                 <button
                   type="button"
                   onClick={handleImport}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none inline-flex items-center"
+                  disabled={isProcessing}
+                  className="px-4 py-2 text-sm font-medium text-white bg-charcoal-600 border border-transparent rounded-md shadow-sm hover:bg-charcoal-700 focus:outline-none inline-flex items-center"
                 >
-                  <Upload className="h-4 w-4 mr-1" />
-                  Import Contacts
+                  {isProcessing ? (
+                    <>
+                      <Upload className="h-4 w-4 mr-1 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-1" />
+                      Import Contacts
+                    </>
+                  )}
                 </button>
               </>
             )}
@@ -259,7 +290,7 @@ const CSVImportModal = ({ day, onClose, onComplete }: CSVImportModalProps) => {
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none"
+                className="px-4 py-2 text-sm font-medium text-white bg-charcoal-600 border border-transparent rounded-md shadow-sm hover:bg-charcoal-700 focus:outline-none"
               >
                 Done
               </button>
