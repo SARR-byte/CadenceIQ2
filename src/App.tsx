@@ -2,7 +2,6 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { ContactProvider } from './contexts/ContactContext';
 import LandingPage from './pages/LandingPage';
-import PaymentPage from './pages/PaymentPage';
 import ContactGrid from './components/contacts/ContactGrid';
 import CalendarView from './components/calendar/CalendarView';
 import AppLayout from './components/layout/AppLayout';
@@ -15,7 +14,6 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/payment" element={<PaymentPage />} />
           <Route path="/access/:token" element={<AccessPage />} />
           <Route path="/app" element={<AppLayout />}>
             <Route index element={<ContactGrid />} />

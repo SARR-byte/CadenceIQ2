@@ -21,20 +21,20 @@ const LandingPage: React.FC = () => {
     <div className="min-h-screen bg-[#151515] text-white">
       <header className="container mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-end">
         <Link 
-          to="/payment" 
+          to="/app" 
           className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-md transition-colors"
         >
-          Buy Now
+          Get Started
         </Link>
       </header>
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 flex flex-col items-center justify-center">
         <div className="flex flex-col md:flex-row items-center gap-8 mb-12 max-w-6xl">
           <Link 
-            to="/payment" 
+            to="/app" 
             className="bg-gray-800 hover:bg-gray-700 px-8 py-4 rounded-md text-white text-lg font-medium transition-colors whitespace-nowrap"
           >
-            Try it for $9.95
+            Try it Now
           </Link>
           <p className="text-2xl md:text-3xl text-gray-300 leading-relaxed">
             A simple yet powerful contact cadence system to help you book more meetings.
@@ -74,7 +74,7 @@ const LandingPage: React.FC = () => {
 
       <div className="container mx-auto px-4 py-4 text-center">
         <span className="inline-block bg-gray-800 rounded-full px-4 py-2 text-sm">
-          One-time payment • No recurring fees
+          Start managing your contacts today
         </span>
       </div>
     </div>
