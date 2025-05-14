@@ -9,6 +9,10 @@ const ContactGrid = () => {
   const [selectedDay, setSelectedDay] = useState<WeekDay>('Monday');
   const [selectedStage, setSelectedStage] = useState<SequenceStage>('First Email');
   
+  const handleStageChange = (stage: SequenceStage) => {
+    setSelectedStage(stage);
+  };
+  
   return (
     <div className="space-y-6">
       <div>
@@ -45,7 +49,7 @@ const ContactGrid = () => {
             <select
               id="stage-filter"
               value={selectedStage}
-              onChange={(e) => setSelectedStage(e.target.value as SequenceStage)}
+              onChange={(e) => handleStageChange(e.target.value as SequenceStage)}
               className="mt-1 block w-64 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             >
               {sequenceStages.map(stage => (
@@ -56,7 +60,11 @@ const ContactGrid = () => {
             </select>
           </div>
           
-          <ContactTable day={selectedDay} stage={selectedStage} />
+          <ContactTable 
+            day={selectedDay} 
+            stage={selectedStage} 
+            onStageChange={handleStageChange}
+          />
         </div>
       </div>
     </div>

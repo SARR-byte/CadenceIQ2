@@ -9,9 +9,10 @@ import SpreadsheetTable from '../common/SpreadsheetTable';
 interface ContactTableProps {
   day: WeekDay;
   stage: SequenceStage;
+  onStageChange: (stage: SequenceStage) => void;
 }
 
-const ContactTable = ({ day, stage }: ContactTableProps) => {
+const ContactTable = ({ day, stage, onStageChange }: ContactTableProps) => {
   const { filteredContacts, leadGoal, deleteContacts } = useContacts();
   const [contacts, setContacts] = useState(filteredContacts(day, stage));
   const [showImportModal, setShowImportModal] = useState(false);
@@ -55,6 +56,10 @@ const ContactTable = ({ day, stage }: ContactTableProps) => {
     setShowImportModal(false);
   };
 
+  const handleContactUpdate = (contactId: string, nextStage: SequenceStage) => {
+    onStageChange(nextStage);
+  };
+
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       {showCelebration && <CelebrationEffect />}
@@ -93,6 +98,7 @@ const ContactTable = ({ day, stage }: ContactTableProps) => {
           columns={columns}
           initialRows={10}
           onSave={(data) => console.log('Saved:', data)}
+          onStageChange={handleContactUpdate}
         />
       </div>
       
