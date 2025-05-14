@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './contexts/AuthContext';
 import { ContactProvider } from './contexts/ContactContext';
 import LandingPage from './pages/LandingPage';
 import PaymentPage from './pages/PaymentPage';
