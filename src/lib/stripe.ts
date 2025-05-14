@@ -1,19 +1,29 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { supabase } from './supabase';
 
-// Initialize Stripe with explicit null check for publishable key
-const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-if (!stripeKey) {
-  throw new Error('Stripe publishable key is missing. Please check your environment variables.');
+// Initialize Stripe with retries
+async function initializeStripe(retries = 3, delay = 1000) {
+  const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  if (!stripeKey) {
+    throw new Error('Stripe publishable key is missing. Please check your environment variables.');
+  }
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const stripe = await loadStripe(stripeKey);
+      if (!stripe) throw new Error('Failed to initialize Stripe');
+      return stripe;
+    } catch (error) {
+      if (attempt === retries) throw error;
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
 }
-const stripePromise = loadStripe(stripeKey);
 
 export async function createCheckoutSession() {
   try {
-    const stripe = await stripePromise;
-    if (!stripe) {
-      throw new Error('Failed to initialize Stripe');
-    }
+    // Initialize Stripe with retries
+    await initializeStripe();
 
     // Create checkout session via Supabase Edge Function
     const { data, error } = await supabase.functions.invoke(
@@ -34,6 +44,9 @@ export async function createCheckoutSession() {
     return data.session_url;
   } catch (error) {
     console.error('Payment error:', error);
+    if (error instanceof Error) {
+      throw new Error(`Payment system error: ${error.message}`);
+    }
     throw new Error('Payment system error. Please try again later.');
   }
 }
