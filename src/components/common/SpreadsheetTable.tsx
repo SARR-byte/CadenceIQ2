@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect, KeyboardEvent } from 'react';
-import { ChevronDown, ChevronUp, Plus, Lightbulb } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Lightbulb, CheckCircle } from 'lucide-react';
 import { useContacts } from '../../contexts/ContactContext';
 import { v4 as uuidv4 } from 'uuid';
 import InsightsModal from '../contacts/InsightsModal';
+import CelebrationEffect from './CelebrationEffect';
+import { toast } from 'react-toastify';
+import { SequenceStage } from '../../types';
 
 interface Cell {
   id: string;
@@ -13,6 +16,8 @@ interface Row {
   id: string;
   contactId: string;
   cells: Cell[];
+  stage?: SequenceStage;
+  completed?: boolean;
 }
 
 interface SpreadsheetTableProps {
@@ -26,7 +31,7 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
   initialRows = 10,
   onSave
 }) => {
-  const { generateInsights, contacts } = useContacts();
+  const { generateInsights, markContactCompleted } = useContacts();
   const [rows, setRows] = useState<Row[]>(() => 
     Array.from({ length: initialRows }, (_, rowIndex) => ({
       id: `row-${rowIndex}`,
@@ -34,7 +39,9 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
       cells: columns.map((_, colIndex) => ({
         id: `cell-${rowIndex}-${colIndex}`,
         value: ''
-      }))
+      })),
+      stage: 'First Email',
+      completed: false
     }))
   );
   
@@ -46,6 +53,8 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
   const [showInsightsModal, setShowInsightsModal] = useState(false);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [processingStage, setProcessingStage] = useState<string | null>(null);
   
   const cellRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -62,6 +71,53 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
       inputRef.current.selectionEnd = inputRef.current.value.length;
     }
   }, [activeCell]);
+
+  useEffect(() => {
+    const allCompleted = rows.every(row => row.completed);
+    if (allCompleted && rows.length > 0) {
+      setShowCelebration(true);
+      setTimeout(() => setShowCelebration(false), 5000);
+    }
+  }, [rows]);
+
+  const handleStageProgression = async (rowIndex: number) => {
+    const row = rows[rowIndex];
+    if (!row || processingStage === row.id) return;
+
+    setProcessingStage(row.id);
+    try {
+      await markContactCompleted(row.contactId);
+      
+      const updatedRows = [...rows];
+      const currentRow = updatedRows[rowIndex];
+      
+      switch (currentRow.stage) {
+        case 'First Email':
+          currentRow.stage = 'Second Email';
+          break;
+        case 'Second Email':
+          currentRow.stage = 'Phone/LinkedIn Connect';
+          break;
+        case 'Phone/LinkedIn Connect':
+          currentRow.stage = 'Breakup Email';
+          currentRow.completed = true;
+          break;
+        case 'Breakup Email':
+          currentRow.completed = true;
+          break;
+      }
+      
+      setRows(updatedRows);
+      onSave?.(updatedRows);
+      
+      toast.success('Contact stage updated successfully');
+    } catch (error) {
+      console.error('Error updating contact stage:', error);
+      toast.error('Failed to update contact stage');
+    } finally {
+      setProcessingStage(null);
+    }
+  };
 
   const handleCellClick = (rowIndex: number, colIndex: number) => {
     if (activeCell) {
@@ -252,7 +308,43 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
 
   const renderCell = (rowIndex: number, colIndex: number, cell: Cell) => {
     const isInsightsColumn = columns[colIndex] === 'Insights';
+    const isContactAttemptColumn = columns[colIndex] === 'Contact Attempt';
+    const row = rows[rowIndex];
     
+    if (isContactAttemptColumn) {
+      return (
+        <div className="flex justify-center items-center">
+          <button
+            onClick={() => handleStageProgression(rowIndex)}
+            disabled={processingStage === row.id || row.completed}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              row.completed
+                ? 'bg-green-100 text-green-800 cursor-not-allowed'
+                : processingStage === row.id
+                ? 'bg-blue-100 text-blue-800 cursor-wait'
+                : 'bg-blue-500 text-white hover:bg-blue-600'
+            }`}
+          >
+            {row.completed ? (
+              <span className="flex items-center">
+                <CheckCircle className="w-4 h-4 mr-1" />
+                Complete
+              </span>
+            ) : processingStage === row.id ? (
+              'Processing...'
+            ) : (
+              'Yes'
+            )}
+          </button>
+          {!row.completed && (
+            <div className="ml-2 text-sm text-gray-500">
+              Stage: {row.stage}
+            </div>
+          )}
+        </div>
+      );
+    }
+
     if (isInsightsColumn) {
       return (
         <div className="flex justify-center">
@@ -304,11 +396,14 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
 
   return (
     <div className="space-y-4">
+      {showCelebration && <CelebrationEffect />}
+      
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
           <span className="block sm:inline">{error}</span>
         </div>
       )}
+      
       <div className="overflow-x-auto shadow-md rounded-lg">
         <table className="w-full border-collapse bg-white table-fixed" role="grid">
           <thead>
@@ -335,7 +430,9 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
             {rows.map((row, rowIndex) => (
               <tr 
                 key={row.id}
-                className={rowIndex === rows.length - 1 ? 'animate-fadeIn' : ''}
+                className={`${rowIndex === rows.length - 1 ? 'animate-fadeIn' : ''} ${
+                  row.completed ? 'bg-green-50' : ''
+                }`}
               >
                 {row.cells.map((cell, colIndex) => (
                   <td
