@@ -7,35 +7,25 @@ const PaymentPage = () => {
   const [loading, setLoading] = useState(false);
 
   const handlePayment = async () => {
-    if (loading) return; // Prevent multiple clicks while processing
-
+    if (loading) return;
+    
     setLoading(true);
     try {
       const sessionUrl = await createCheckoutSession();
-      if (sessionUrl) {
-        window.location.href = sessionUrl;
-      } else {
-        throw new Error('Failed to create checkout session');
+      if (!sessionUrl) {
+        throw new Error('Failed to create payment session');
       }
+      window.location.href = sessionUrl;
     } catch (error) {
       console.error('Payment error:', error);
       toast.error(
         error instanceof Error 
           ? error.message 
-          : 'Payment processing failed. Please try again later.',
-        {
-          position: 'top-center',
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-        }
+          : 'Payment system error',
+        { position: 'bottom-right' }
       );
-      setLoading(false); // Reset loading state on error
+      setLoading(false);
     }
-    // Note: We don't call setLoading(false) in finally block because on success
-    // we redirect to Stripe, and we want to keep the button disabled
   };
 
   return (
