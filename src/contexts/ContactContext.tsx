@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { addDays } from 'date-fns';
-import { openai } from '../utils/api';
+import { generateInsights } from '../utils/api';
 import { Contact, WeekDay, SequenceStage, CalendarEvent, SocialProfile } from '../types';
 
 interface ContactContextType {
@@ -210,69 +210,17 @@ export const ContactProvider: React.FC<{ children: React.ReactNode }> = ({ child
         throw new Error('No social profiles available for analysis. Please add at least one social profile link.');
       }
 
-      console.log('Starting insights generation for contact:', contact.entityName);
-      
-      const companyPrompt = contact.companyLinkedIn ? `Analyze this company LinkedIn profile: ${contact.companyLinkedIn}
-        Provide insights about:
-        1. Company founding date and milestones
-        2. Recent awards and recognition
-        3. Latest news and developments
-        4. Core products/services
-        5. Company culture and values
-        Format as JSON with these keys: founded, milestones, awards, recentNews, offerings, culture` : null;
-
-      const personalPrompt = (contact.contactLinkedIn || contact.contactFacebook) ? `Analyze these social profiles:
-        ${contact.contactLinkedIn ? `LinkedIn: ${contact.contactLinkedIn}` : ''}
-        ${contact.contactFacebook ? `Facebook: ${contact.contactFacebook}` : ''}
-        Provide insights about:
-        1. Career history and progression
-        2. Education background
-        3. Professional interests
-        4. Published content
-        5. Social causes
-        6. Recent activities
-        7. Notable achievements
-        Format as JSON with these keys: career, education, interests, publications, causes, recentActivity, achievements` : null;
-
-      console.log('Sending API requests...');
-      
-      const [companyResponse, personalResponse] = await Promise.all([
-        companyPrompt ? openai.chat.completions.create({
-          model: "gpt-4",
-          messages: [{ role: "user", content: companyPrompt }],
-        }) : Promise.resolve(null),
-        personalPrompt ? openai.chat.completions.create({
-          model: "gpt-4",
-          messages: [{ role: "user", content: personalPrompt }],
-        }) : Promise.resolve(null)
-      ]);
-
-      console.log('Processing API responses');
-      
-      const companyInfo = companyResponse?.choices[0]?.message?.content
-        ? JSON.parse(companyResponse.choices[0].message.content)
-        : null;
-      
-      const personalInfo = personalResponse?.choices[0]?.message?.content
-        ? JSON.parse(personalResponse.choices[0].message.content)
-        : null;
-
-      const currentContact = contacts.find(c => c.id === contactId);
-      if (!currentContact) {
-        throw new Error('Contact was deleted during insights generation.');
-      }
+      const insights = await generateInsights({
+        linkedin: contact.contactLinkedIn || contact.companyLinkedIn,
+        facebook: contact.contactFacebook
+      });
 
       const updatedContact = {
-        ...currentContact,
-        socialProfile: {
-          companyInfo,
-          personalInfo,
-          lastUpdated: new Date()
-        }
+        ...contact,
+        socialProfile: insights
       };
 
       updateContact(updatedContact);
-      console.log('Successfully updated contact with insights');
       
     } catch (error) {
       console.error('Error generating insights:', error);

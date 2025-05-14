@@ -1,12 +1,4 @@
-import OpenAI from 'openai';
 import { SocialProfile } from '../types';
-
-const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-
-export const openai = new OpenAI({
-  apiKey: apiKey,
-  dangerouslyAllowBrowser: true,
-});
 
 const generateRandomDate = () => {
   const start = new Date(2020, 0, 1);
