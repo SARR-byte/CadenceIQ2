@@ -230,6 +230,15 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
       return;
     }
 
+    // Check if required social profile data exists
+    const linkedInUrl = row.cells[4]?.value || row.cells[5]?.value; // Company or Contact LinkedIn
+    const facebookUrl = row.cells[6]?.value; // Contact Facebook
+
+    if (!linkedInUrl && !facebookUrl) {
+      setError('Please add at least one social profile (LinkedIn or Facebook) to generate insights');
+      return;
+    }
+
     setGeneratingInsights(row.id);
     try {
       await generateInsights(row.contactId);
@@ -290,6 +299,10 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
     }
 
     if (isInsightsColumn) {
+      const hasRequiredSocialData = row.cells.some((cell, idx) => 
+        (idx === 4 || idx === 5 || idx === 6) && cell.value.trim() !== ''
+      );
+
       return (
         <div className="flex justify-center">
           <button
@@ -299,11 +312,13 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({
                 ? 'bg-amber-100 text-amber-600 animate-pulse'
                 : cell.value
                   ? 'bg-amber-50 text-amber-500 hover:bg-amber-100'
-                  : 'text-amber-500 hover:bg-amber-50'
+                  : hasRequiredSocialData
+                    ? 'text-amber-500 hover:bg-amber-50'
+                    : 'text-gray-300 cursor-not-allowed'
             }`}
             aria-label="Get insights"
-            title="Get insights"
-            disabled={generatingInsights === rows[rowIndex].id}
+            title={hasRequiredSocialData ? "Get insights" : "Add social profiles to generate insights"}
+            disabled={generatingInsights === rows[rowIndex].id || !hasRequiredSocialData}
           >
             <Lightbulb className="w-5 h-5" />
           </button>
