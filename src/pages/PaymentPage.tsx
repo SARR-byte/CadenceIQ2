@@ -13,7 +13,8 @@ const PaymentPage = () => {
       window.location.href = sessionUrl;
     } catch (error) {
       console.error('Payment error:', error);
-      toast.error('Failed to process payment. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Payment processing failed');
+    } finally {
       setLoading(false);
     }
   };
@@ -57,15 +58,21 @@ const PaymentPage = () => {
                 onClick={handlePayment}
                 disabled={loading}
                 className={`w-full py-3 px-4 rounded-md font-medium text-white ${
-                  loading ? 'bg-charcoal-400' : 'bg-charcoal-600 hover:bg-charcoal-700'
+                  loading ? 'bg-charcoal-400 cursor-not-allowed' : 'bg-charcoal-600 hover:bg-charcoal-700'
                 } focus:outline-none focus:ring-2 focus:ring-charcoal-500 focus:ring-offset-2 transition-colors`}
               >
                 {loading ? 'Processing...' : 'Pay $9.95'}
               </button>
               
-              <p className="mt-4 text-xs text-gray-500 text-center">
-                Secure payment processing by Stripe. Your card information is never stored.
-              </p>
+              <div className="mt-4 text-center">
+                <p className="text-xs text-gray-500">
+                  Secure payment processing by Stripe
+                </p>
+                <div className="mt-2 flex items-center justify-center space-x-2">
+                  <img src="https://cdn.jsdelivr.net/gh/stripe/press-kit@master/logo/48x48.png" alt="Stripe" className="h-6" />
+                  <img src="https://cdn.jsdelivr.net/gh/stripe/press-kit@master/symbol/mobile.png" alt="Secure" className="h-6" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
