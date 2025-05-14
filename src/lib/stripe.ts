@@ -1,8 +1,8 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { supabase } from './supabase';
 
-// Initialize Stripe with improved error handling and logging
-async function initializeStripe(retries = 3, delay = 2000) {
+// Initialize Stripe with improved error handling and exponential backoff
+async function initializeStripe(maxRetries = 3) {
   const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY?.trim();
   
   if (!stripeKey) {
@@ -13,32 +13,17 @@ async function initializeStripe(retries = 3, delay = 2000) {
     throw new Error('Invalid Stripe publishable key format. Key must start with "pk_".');
   }
 
-  // Simplified CDN check that's more resilient
-  try {
-    const response = await fetch('https://js.stripe.com/v3/', {
-      method: 'HEAD',
-      mode: 'no-cors'
-    });
-    
-    // With no-cors, we can't check status, but we can verify the response exists
-    if (!response) {
-      console.warn('Stripe CDN check returned unexpected response');
-    }
-  } catch (error) {
-    // Log the error but don't fail - Stripe's loadStripe will handle actual availability
-    console.warn('Stripe CDN pre-check warning:', error);
-  }
+  let attempt = 0;
+  const maxDelay = 8000; // Maximum delay of 8 seconds
 
-  let lastError;
-  for (let attempt = 1; attempt <= retries; attempt++) {
+  while (attempt < maxRetries) {
     try {
-      console.log(`Attempting to initialize Stripe (attempt ${attempt}/${retries})`);
-      
-      // Add a small delay between retries to avoid rate limiting
-      if (attempt > 1) {
+      // Exponential backoff delay
+      if (attempt > 0) {
+        const delay = Math.min(Math.pow(2, attempt) * 1000, maxDelay);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
-      
+
       const stripe = await loadStripe(stripeKey);
       
       if (!stripe) {
@@ -48,22 +33,29 @@ async function initializeStripe(retries = 3, delay = 2000) {
       console.log('Stripe successfully initialized');
       return stripe;
     } catch (error) {
-      lastError = error;
-      console.warn(`Stripe initialization attempt ${attempt} failed:`, error);
+      attempt++;
+      console.warn(`Stripe initialization attempt ${attempt}/${maxRetries} failed:`, error);
       
-      if (attempt === retries) {
-        console.error('All Stripe initialization attempts failed');
-        break;
+      if (attempt === maxRetries) {
+        throw new Error(
+          error instanceof Error 
+            ? `Failed to load Stripe.js: ${error.message}` 
+            : 'Failed to load Stripe.js'
+        );
       }
     }
   }
 
-  const errorMessage = lastError instanceof Error ? lastError.message : 'Unknown error';
-  throw new Error(`Unable to initialize Stripe payment system: ${errorMessage}. Please try refreshing the page. If the issue persists, contact support.`);
+  throw new Error('Unable to initialize Stripe after maximum retries');
 }
 
 export async function createCheckoutSession() {
   try {
+    // Pre-check environment variable
+    if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) {
+      throw new Error('Stripe publishable key is not configured');
+    }
+
     const stripe = await initializeStripe();
     
     if (!stripe) {
@@ -93,7 +85,13 @@ export async function createCheckoutSession() {
   } catch (error) {
     console.error('Payment error:', error);
     if (error instanceof Error) {
-      throw new Error(`Payment system error: ${error.message}`);
+      // Provide more specific error messages based on the error type
+      const message = error.message.includes('publishable key')
+        ? 'Payment system configuration error. Please contact support.'
+        : error.message.includes('Stripe.js')
+        ? 'Unable to load payment system. Please check your internet connection and try again.'
+        : `Payment system error: ${error.message}`;
+      throw new Error(message);
     }
     throw new Error('Payment system error. Please try again later.');
   }
