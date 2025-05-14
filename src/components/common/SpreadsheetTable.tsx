@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import { ChevronDown, ChevronUp, Plus, Lightbulb } from 'lucide-react';
 import { useContacts } from '../../contexts/ContactContext';
 import { v4 as uuidv4 } from 'uuid';
